@@ -15,35 +15,50 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
  * [!] This contract sends released tokens to a distribution/claim contract.
  */
 contract MbtcBscTokenUpgradable is
-Initializable,
-ERC20Upgradeable,
-OwnableUpgradeable,
-ReentrancyGuardUpgradeable,
-AccessControlUpgradeable,
-UUPSUpgradeable
+    Initializable,
+    ERC20Upgradeable,
+    OwnableUpgradeable,
+    ReentrancyGuardUpgradeable,
+    AccessControlUpgradeable,
+    UUPSUpgradeable
 {
 
     // --- Constants ---
     string public constant TOKEN_NAME = "Meme Bitcoin";
     string public constant TOKEN_SYMBOL = "MBTC";
 
-    uint256 private constant DECIMALS_FACTOR = 10 ** 18;
+    uint256 private constant DECIMALS_FACTOR = 10 ** 8;
     uint256 public constant INITIAL_TOTAL_SUPPLY = 210_000_000_000 * DECIMALS_FACTOR;
 
-    uint256 public constant PERIOD_DURATION = 1 hours; // Testnet
-//    uint256 public constant PERIOD_DURATION = 122 days; // Mainnet , 1/3 of a year (approx. 4 months).
+    // Minimum release interval (Bitcoin homage)
+    uint256 public constant RELEASE_INTERVAL = 10 minutes;
 
-    uint256 public constant RELEASE_START_TIME = 1761868800; // Testnet: UTC 2025-10-31 00:00:00
-//    uint256 public constant RELEASE_START_TIME = 1767225600; // Mainnet: UTC 2026-01-03 00:00:00
+    uint256 public constant RELEASE_START_TIME = 1763942400; // Testnet: UTC 2025-11-24 00:00:00
+    //    uint256 public constant RELEASE_START_TIME = 1767225600; // Mainnet: UTC 2026-01-03 00:00:00
+
+    uint256 public constant HALVING_PERIOD_DURATION = 4 hours; // Testnet
+    //    uint256 public constant HALVING_PERIOD_DURATION = 122 days; // Mainnet , 1/3 of a year (approx. 4 months).
+
+    // Testnet, 1 hour / 10 minutes = 6
+    // Mainnet, 122 days / 10 minutes = 17568
+    uint256 public HALVING_RELEASES_PER_CYCLE;
 
     // --- State Variables ---
     uint256 public nextReleaseTime;
     uint256 public currentReleaseAmount;
     address public distributionContract;
-    uint256 public periodsReleased;
+    uint256 public periodsReleased; // Total number of 10-minute release periods
+
+    uint256 public releasesUntilHalving; // Number of 10-minute releases remaining until the next halving
+    uint256 public currentHalvingCycle; // The current halving cycle number
 
     // --- Events ---
-    event TokensReleased(address indexed toContract, uint256 amount, uint256 period);
+    event TokensReleased(
+        address indexed toContract,
+        uint256 amount,
+        uint256 period,
+        uint256 timestamp
+    );
     event DistributionContractChanged(address indexed newContract);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -62,17 +77,25 @@ UUPSUpgradeable
 
         distributionContract = _distributionContract;
 
-        // Automatically calculates the first release amount as half of the total supply.
-        currentReleaseAmount = INITIAL_TOTAL_SUPPLY / 2;
+        require(HALVING_PERIOD_DURATION % RELEASE_INTERVAL == 0, "Intervals must be divisible");
+        HALVING_RELEASES_PER_CYCLE = HALVING_PERIOD_DURATION / RELEASE_INTERVAL;
+        currentReleaseAmount = (INITIAL_TOTAL_SUPPLY / 2) / HALVING_RELEASES_PER_CYCLE;
+
+        // Initialize halving trackers
+        releasesUntilHalving = HALVING_RELEASES_PER_CYCLE;
+        currentHalvingCycle = 0;
 
         _mint(address(this), INITIAL_TOTAL_SUPPLY);
-
         nextReleaseTime = RELEASE_START_TIME;
         periodsReleased = 0;
     }
 
+    function decimals() public view virtual override returns (uint8) {
+        return 8;
+    }
+
     /**
-     * Releases tokens to the 'Distribution Contract' when the release period is reached (approx. 4 months).
+     * Releases tokens to the 'Distribution Contract' when the release period is reached (every 10 minutes) and applies halving logic when the cycle is complete.
      */
     function releaseTokens() external onlyOwner nonReentrant {
         require(block.timestamp >= nextReleaseTime, "Release period not yet reached");
@@ -89,13 +112,20 @@ UUPSUpgradeable
 
         // Update state variables for the next release
         periodsReleased++;
-        nextReleaseTime += PERIOD_DURATION;
-        currentReleaseAmount = currentReleaseAmount / 2;
+        nextReleaseTime += RELEASE_INTERVAL;
+        releasesUntilHalving--;
+
+        // Apply halving logic when the cycle is complete
+        if (releasesUntilHalving == 0) {
+            currentHalvingCycle++;
+            releasesUntilHalving = HALVING_RELEASES_PER_CYCLE;
+            currentReleaseAmount = currentReleaseAmount / 2;
+        }
 
         // Send token to the Distribution Contract
         _transfer(address(this), distributionContract, amountToRelease);
 
-        emit TokensReleased(distributionContract, amountToRelease, periodsReleased);
+        emit TokensReleased(distributionContract, amountToRelease, periodsReleased, block.timestamp);
     }
 
     /**
