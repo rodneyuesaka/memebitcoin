@@ -5,21 +5,20 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-interface IMbtcToken {
-    function transfer(address to, uint256 amount) external returns (bool);
-}
 
 contract MbtcBscClaimUpgradable is Initializable, AccessControlUpgradeable, UUPSUpgradeable, PausableUpgradeable {
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
-    IMbtcToken public mbtcToken;
+    IERC20 public mbtcToken;
 
     mapping(address => uint256) public claimableTokens;
 
     event TokensAssigned(address indexed user, uint256 amount);
     event TokensClaimed(address indexed user, uint256 amount);
+    event TokenAddressUpdated(address oldAddress, address newAddress);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -31,7 +30,7 @@ contract MbtcBscClaimUpgradable is Initializable, AccessControlUpgradeable, UUPS
         __Pausable_init();
         __UUPSUpgradeable_init();
 
-        mbtcToken = IMbtcToken(_mbtcTokenAddress);
+        mbtcToken = IERC20(_mbtcTokenAddress);
 
         _grantRole(DEFAULT_ADMIN_ROLE, _initialAdmin);
         _grantRole(UPGRADER_ROLE, _msgSender());
@@ -72,6 +71,28 @@ contract MbtcBscClaimUpgradable is Initializable, AccessControlUpgradeable, UUPS
 
     function unpauseClaims() public onlyRole(ADMIN_ROLE) {
         _unpause();
+    }
+
+    /**
+     * @dev Recovers ERC20 tokens sent to this contract by mistake.
+     * This function allows the admin to return tokens accidentally transferred
+     * directly to the contract address by users, or to migrate funds during upgrades.
+     */
+    function recoverERC20(address _token, uint256 _amount) public onlyRole(ADMIN_ROLE) {
+        IERC20(_token).transfer(msg.sender, _amount);
+    }
+
+    /**
+       * @dev Updates the MBTC token contract address.
+       */
+    function setTokenAddress(address _newTokenAddress) public onlyRole(ADMIN_ROLE) {
+        require(_newTokenAddress != address(0), "Invalid address");
+
+        address oldAddress = address(mbtcToken);
+
+        mbtcToken = IERC20(_newTokenAddress);
+
+        emit TokenAddressUpdated(oldAddress, _newTokenAddress);
     }
 
     function _authorizeUpgrade(address newImplementation) internal view override onlyRole(UPGRADER_ROLE) {}
