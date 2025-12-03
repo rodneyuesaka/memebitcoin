@@ -33,10 +33,10 @@ contract MbtcBscTokenUpgradable is
     // Minimum release interval (Bitcoin homage)
     uint256 public constant RELEASE_INTERVAL = 10 minutes;
 
-    uint256 public constant RELEASE_START_TIME = 1763942400; // Testnet: UTC 2025-11-24 00:00:00
-    //    uint256 public constant RELEASE_START_TIME = 1767225600; // Mainnet: UTC 2026-01-03 00:00:00
+    uint256 public constant RELEASE_START_TIME = 1764720000; // Testnet: UTC 2025-12-03 00:00:00
+    //    uint256 public constant RELEASE_START_TIME = 1767398400; // Mainnet: UTC 2026-01-03 00:00:00
 
-    uint256 public constant HALVING_PERIOD_DURATION = 4 hours; // Testnet
+    uint256 public constant HALVING_PERIOD_DURATION = 24 hours; // Testnet
     //    uint256 public constant HALVING_PERIOD_DURATION = 122 days; // Mainnet , 1/3 of a year (approx. 4 months).
 
     // Testnet, 1 hour / 10 minutes = 6
