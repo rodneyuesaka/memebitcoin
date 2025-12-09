@@ -15,10 +15,14 @@ contract MbtcBscClaimUpgradable is Initializable, AccessControlUpgradeable, UUPS
     IERC20 public mbtcToken;
 
     mapping(address => uint256) public claimableTokens;
+    mapping(address => bool) public isBlocked;
+
+    uint256 public totalClaimed;
 
     event TokensAssigned(address indexed user, uint256 amount);
     event TokensClaimed(address indexed user, uint256 amount);
     event TokenAddressUpdated(address oldAddress, address newAddress);
+    event BlockStatusUpdated(address indexed user, bool status);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -40,15 +44,30 @@ contract MbtcBscClaimUpgradable is Initializable, AccessControlUpgradeable, UUPS
     /**
      * ADMIN_ROLE only. Assigns claimable tokens to a user.
      */
-    function assignTokens(address _user, uint256 _amount) public onlyRole(ADMIN_ROLE) {
-        claimableTokens[_user] = _amount;
-        emit TokensAssigned(_user, _amount);
+    function assignTokens(address user, uint256 amount) public onlyRole(ADMIN_ROLE) {
+        _assignTokens(user, amount);
+    }
+
+    /**
+     * Batch assigns tokens to multiple users. Saves gas.
+       */
+    function batchAssignTokens(address[] memory _users, uint256[] memory _amounts) public onlyRole(ADMIN_ROLE) {
+        require(_users.length == _amounts.length, "Arrays length mismatch");
+        for (uint256 i = 0; i < _users.length; i++) {
+            _assignTokens(_users[i], _amounts[i]);
+        }
+    }
+
+    function _assignTokens(address user, uint256 amount) internal {
+        claimableTokens[user] = amount;
+        emit TokensAssigned(user, amount);
     }
 
     /**
      * User claims their assigned tokens. Tokens are sent from this Claim contract's balance.
      */
     function claimTokens(uint256 _amount) public whenNotPaused {
+        require(!isBlocked[msg.sender], "Address is blocked");
         require(_amount > 0, "Claim amount must be greater than 0");
         require(claimableTokens[msg.sender] >= _amount, "Not enough claimable tokens");
 
@@ -59,6 +78,11 @@ contract MbtcBscClaimUpgradable is Initializable, AccessControlUpgradeable, UUPS
         require(success, "Token transfer failed");
 
         emit TokensClaimed(msg.sender, _amount);
+    }
+
+    function setBlockStatus(address _user, bool _status) public onlyRole(ADMIN_ROLE) {
+        isBlocked[_user] = _status;
+        emit BlockStatusUpdated(_user, _status);
     }
 
     /**
@@ -74,7 +98,7 @@ contract MbtcBscClaimUpgradable is Initializable, AccessControlUpgradeable, UUPS
     }
 
     /**
-     * @dev Recovers ERC20 tokens sent to this contract by mistake.
+     * Recovers ERC20 tokens sent to this contract by mistake.
      * This function allows the admin to return tokens accidentally transferred
      * directly to the contract address by users, or to migrate funds during upgrades.
      */
@@ -83,7 +107,7 @@ contract MbtcBscClaimUpgradable is Initializable, AccessControlUpgradeable, UUPS
     }
 
     /**
-       * @dev Updates the MBTC token contract address.
+       * Updates the MBTC token contract address.
        */
     function setTokenAddress(address _newTokenAddress) public onlyRole(ADMIN_ROLE) {
         require(_newTokenAddress != address(0), "Invalid address");
@@ -97,5 +121,5 @@ contract MbtcBscClaimUpgradable is Initializable, AccessControlUpgradeable, UUPS
 
     function _authorizeUpgrade(address newImplementation) internal view override onlyRole(UPGRADER_ROLE) {}
 
-    uint256[50] private __gap;
+    uint256[48] private __gap;
 }

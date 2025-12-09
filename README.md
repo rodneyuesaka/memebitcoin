@@ -17,12 +17,9 @@ This is an Upgradable ERC-20 token contract deployed on the **BSC Testnet**. It 
 | Version    | Contract Type      | Address                                                                                                                          | Status     |
 |:-----------|:-------------------|:---------------------------------------------------------------------------------------------------------------------------------|:-----------|
 | **v0.4.0** | **Token (Latest)** | **[0xAC3E72795FDC9Bb2e5714b7fd17E2cAf909611D2](https://testnet.bscscan.com/token/0xAC3E72795FDC9Bb2e5714b7fd17E2cAf909611D2)**   | **Active** |
-| **v0.4.0** | **Claim (Latest)** | **[0xb60EFb7485072E8FD5eDCB79Ef3712416710f5B2](https://testnet.bscscan.com/address/0xb60EFb7485072E8FD5eDCB79Ef3712416710f5B2)** | **Active** |
+| **v0.4.1** | **Claim (Latest)** | **[0xb60EFb7485072E8FD5eDCB79Ef3712416710f5B2](https://testnet.bscscan.com/address/0xb60EFb7485072E8FD5eDCB79Ef3712416710f5B2)** | **Active** |
 | **v0.1.0** | **Checkin**        | **[0xfC84c4C01881628b855d214aAfB99215F67cfC6f](https://testnet.bscscan.com/address/0xfC84c4C01881628b855d214aAfB99215F67cfC6f)** | **Active** |
-| v0.3.0     | Token              | [0xe13d91a5dBd13dFe7AF52ffFA40f314c83AB8436](https://testnet.bscscan.com/token/0xe13d91a5dBd13dFe7AF52ffFA40f314c83AB8436)       | Deprecated |
-| v0.3.0     | Claim              | [0x4b35BFa89F14F38DC1d545cC059Be005DbeB5364](https://testnet.bscscan.com/address/0x4b35BFa89F14F38DC1d545cC059Be005DbeB5364)     | Deprecated |
-| v0.2.1     | Token              | [0x480e79b6FE44bd8da3B8C979ce6ce4F5c99593f1](https://testnet.bscscan.com/token/0x480e79b6FE44bd8da3B8C979ce6ce4F5c99593f1)       | Deprecated |
-| v0.2.1     | Claim              | [0x770585251f6070038Bfaa9b904207e0E6f87C804](https://testnet.bscscan.com/address/0x770585251f6070038Bfaa9b904207e0E6f87C804)     | Deprecated |
+| **v0.4.0** | **Donation** | **[0xb795cE8B16114A12F2557155b365d456a436EbC0](https://testnet.bscscan.com/address/0xb795cE8B16114A12F2557155b365d456a436EbC0)** | **Active** |
 
 ---
 
@@ -43,14 +40,52 @@ The entire supply is minted to the Token contract address upon deployment and is
 
 ---
 
+# 🪙 Claim & Distribution Logic (v0.4.1 Update)
+
+The `MbtcBscClaimUpgradable` contract is responsible for receiving the released tokens and managing the final distribution to end-users.
+
+### **v0.4.1 Patch Notes (Operational Optimization)**
+1.  **Batch Assignment:** Introduced `batchAssignTokens` to assign rewards to multiple users in a single transaction, significantly reducing gas costs.
+2.  **Blocklist Governance:** Replaced the legacy blacklist system with a standard `Blocklist` mechanism (`isBlocked`, `setBlockStatus`) to manage access and prevent abuse.
+
+### **Operational Flow**
+
+| Step | Detail | Roles |
+| :--- | :--- | :--- |
+| **1. Batch Assign** | An external service calls `batchAssignTokens([users], [amounts])`. User balances are synchronized with the backend. | `ADMIN_ROLE` |
+| **2. Claim Tokens** | The user calls `claimTokens(amount)`. The contract checks if the user is **blocked**, verifies the balance, and transfers MBTC. | User (whenNotPaused) |
+| **3. Governance** | Admin can use `setBlockStatus(user, bool)` to restrict specific addresses from claiming tokens in case of policy violations. | `ADMIN_ROLE` |
+
+---
+
+# 💸 Donation Infrastructure (v0.4.0 New)
+
+The `MbtcBscDonationUpgradable` contract provides a secure infrastructure for receiving multiple asset types and tracking contributions via on-chain events.
+
+### **Key Features**
+1.  **Multi-Asset Support:** Accepts both **Native BNB** and whitelisted **ERC20 Tokens** (e.g., WBTC, USDT).
+2.  **Spam Protection:** Administrators can set a **Minimum Donation Amount** per token to prevent dust attacks and log spam.
+3.  **Asset Rescue:** The generic `withdraw` function allows administrators to recover any token sent to the contract (including non-whitelisted ones), preventing accidental asset loss.
+
+### **How it works**
+
+| Action | Function Call | Description |
+| :--- | :--- | :--- |
+| **Native Donation** | `receive()` or `donateNative()` | Users send BNB directly. The contract emits `DonationReceived(address(0), ...)` for backend tracking. |
+| **ERC20 Donation** | `donateERC20(token, amount)` | Users approve and donate ERC20 tokens. The contract verifies the whitelist and emits `DonationReceived(token, ...)`. |
+| **Withdrawal** | `withdraw(token, recipient)` | Admin withdraws accumulated funds. Can be used for revenue collection or rescuing lost assets. |
+
+---
+
 # 🪙 Claim & Distribution Logic (v0.4.0 Update)
 
 The `MbtcBscClaimUpgradable` contract is responsible for receiving the released tokens and managing the final distribution to end-users.
 
 ### **v0.4.0 Patch Notes (Major Safety Update)**
 1.  **Safety First:** Added `recoverERC20` to rescue tokens accidentally sent to the contract address.
-2.  **Maintainability:** Added `setTokenAddress` to update the token contract linkage without redeploying.
-3.  **Optimization:** Migrated to standard `IERC20` interface for better compatibility and gas efficiency.
+2.  **Assignment Control:** Maintained `assignTokens` as an overwrite (`=`) operation, allowing Admins to set exact balances or revoke eligibility.
+3.  **Maintainability:** Added `setTokenAddress` to update the token contract linkage without redeploying.
+4.  **Optimization:** Migrated to standard `IERC20` interface for better compatibility and gas efficiency.
 
 ### **Operational Flow**
 
