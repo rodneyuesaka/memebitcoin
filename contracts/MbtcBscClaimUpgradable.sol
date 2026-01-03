@@ -3,12 +3,19 @@ pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 
-contract MbtcBscClaimUpgradable is Initializable, AccessControlUpgradeable, UUPSUpgradeable, PausableUpgradeable {
+contract MbtcBscClaimUpgradable is
+    Initializable,
+    AccessControlUpgradeable,
+    ReentrancyGuardUpgradeable,
+    UUPSUpgradeable,
+    PausableUpgradeable
+{
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
@@ -31,6 +38,7 @@ contract MbtcBscClaimUpgradable is Initializable, AccessControlUpgradeable, UUPS
 
     function initialize(address _mbtcTokenAddress, address _initialAdmin) public initializer {
         __AccessControl_init();
+        __ReentrancyGuard_init();
         __Pausable_init();
         __UUPSUpgradeable_init();
 
@@ -39,6 +47,22 @@ contract MbtcBscClaimUpgradable is Initializable, AccessControlUpgradeable, UUPS
         _grantRole(DEFAULT_ADMIN_ROLE, _initialAdmin);
         _grantRole(UPGRADER_ROLE, _msgSender());
         _grantRole(ADMIN_ROLE, _initialAdmin);
+    }
+
+    function increaseTokens(address user, uint256 amount) public onlyRole(ADMIN_ROLE) {
+        _increaseTokens(user, amount);
+    }
+
+    function batchIncreaseTokens(address[] memory _users, uint256[] memory _amounts) public onlyRole(ADMIN_ROLE) {
+        require(_users.length == _amounts.length, "Arrays length mismatch");
+        for (uint256 i = 0; i < _users.length; i++) {
+            _increaseTokens(_users[i], _amounts[i]);
+        }
+    }
+
+    function _increaseTokens(address user, uint256 amount) internal {
+        claimableTokens[user] += amount;
+        emit TokensAssigned(user, claimableTokens[user]);
     }
 
     /**
@@ -66,18 +90,24 @@ contract MbtcBscClaimUpgradable is Initializable, AccessControlUpgradeable, UUPS
     /**
      * User claims their assigned tokens. Tokens are sent from this Claim contract's balance.
      */
-    function claimTokens(uint256 _amount) public whenNotPaused {
+    function claimTokens(uint256 _amount) public whenNotPaused nonReentrant {
         require(!isBlocked[msg.sender], "Address is blocked");
         require(_amount > 0, "Claim amount must be greater than 0");
         require(claimableTokens[msg.sender] >= _amount, "Not enough claimable tokens");
+        require(mbtcToken.balanceOf(address(this)) >= _amount, "Contract balance insufficient");
 
         claimableTokens[msg.sender] -= _amount;
-
+        totalClaimed += _amount;
 
         bool success = mbtcToken.transfer(msg.sender, _amount);
         require(success, "Token transfer failed");
 
         emit TokensClaimed(msg.sender, _amount);
+    }
+
+    function getClaimableAmount(address _user) public view returns (uint256) {
+        if (isBlocked[_user]) return 0;
+        return claimableTokens[_user];
     }
 
     function setBlockStatus(address _user, bool _status) public onlyRole(ADMIN_ROLE) {
@@ -111,15 +141,12 @@ contract MbtcBscClaimUpgradable is Initializable, AccessControlUpgradeable, UUPS
        */
     function setTokenAddress(address _newTokenAddress) public onlyRole(ADMIN_ROLE) {
         require(_newTokenAddress != address(0), "Invalid address");
-
         address oldAddress = address(mbtcToken);
-
         mbtcToken = IERC20(_newTokenAddress);
-
         emit TokenAddressUpdated(oldAddress, _newTokenAddress);
     }
 
     function _authorizeUpgrade(address newImplementation) internal view override onlyRole(UPGRADER_ROLE) {}
 
-    uint256[48] private __gap;
+    uint256[50] private __gap;
 }

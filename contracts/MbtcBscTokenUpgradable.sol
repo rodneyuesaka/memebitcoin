@@ -32,15 +32,10 @@ contract MbtcBscTokenUpgradable is
 
     // Minimum release interval (Bitcoin homage)
     uint256 public constant RELEASE_INTERVAL = 10 minutes;
+    uint256 public constant RELEASE_START_TIME = 1767464105; // UTC 2026-01-03 18:15:05
+    uint256 public constant HALVING_PERIOD_DURATION = 122 days; // 1/3 of a year (approx. 4 months).
 
-    uint256 public constant RELEASE_START_TIME = 1764720000; // Testnet: UTC 2025-12-03 00:00:00
-    //    uint256 public constant RELEASE_START_TIME = 1767398400; // Mainnet: UTC 2026-01-03 00:00:00
-
-    uint256 public constant HALVING_PERIOD_DURATION = 24 hours; // Testnet
-    //    uint256 public constant HALVING_PERIOD_DURATION = 122 days; // Mainnet , 1/3 of a year (approx. 4 months).
-
-    // Testnet, 1 hour / 10 minutes = 6
-    // Mainnet, 122 days / 10 minutes = 17568
+    // 122 days / 10 minutes = 17568
     uint256 public HALVING_RELEASES_PER_CYCLE;
 
     // --- State Variables ---
@@ -74,11 +69,13 @@ contract MbtcBscTokenUpgradable is
         __ERC20_init(TOKEN_NAME, TOKEN_SYMBOL);
         __Ownable_init(_initialOwner);
         __ReentrancyGuard_init();
+        __UUPSUpgradeable_init();
 
         distributionContract = _distributionContract;
 
         require(HALVING_PERIOD_DURATION % RELEASE_INTERVAL == 0, "Intervals must be divisible");
         HALVING_RELEASES_PER_CYCLE = HALVING_PERIOD_DURATION / RELEASE_INTERVAL;
+
         currentReleaseAmount = (INITIAL_TOTAL_SUPPLY / 2) / HALVING_RELEASES_PER_CYCLE;
 
         // Initialize halving trackers
@@ -97,7 +94,7 @@ contract MbtcBscTokenUpgradable is
     /**
      * Releases tokens to the 'Distribution Contract' when the release period is reached (every 10 minutes) and applies halving logic when the cycle is complete.
      */
-    function releaseTokens() external onlyOwner nonReentrant {
+    function releaseTokens() external nonReentrant {
         require(block.timestamp >= nextReleaseTime, "Release period not yet reached");
         require(distributionContract != address(0), "Distribution contract not set");
 
