@@ -24,7 +24,7 @@ contract MbtcBscTokenUpgradable is
 {
 
     // --- Constants ---
-    string public constant TOKEN_NAME = "Meme Bitcoin";
+    string public constant TOKEN_NAME = "MemeBitcoin";
     string public constant TOKEN_SYMBOL = "MBTC";
 
     uint256 private constant DECIMALS_FACTOR = 10 ** 8;
@@ -85,6 +85,15 @@ contract MbtcBscTokenUpgradable is
         _mint(address(this), INITIAL_TOTAL_SUPPLY);
         nextReleaseTime = RELEASE_START_TIME;
         periodsReleased = 0;
+    }
+
+    /**
+     * Rewrites the ERC20 name/symbol storage set by initialize().
+     * The live proxy's name() reads storage, so a constant change alone
+     * does not reach deployed proxies — this runs once via upgradeToAndCall.
+     */
+    function initializeV2() public reinitializer(2) {
+        __ERC20_init_unchained(TOKEN_NAME, TOKEN_SYMBOL);
     }
 
     function decimals() public view virtual override returns (uint8) {

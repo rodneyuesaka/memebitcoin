@@ -1,6 +1,6 @@
-# 🚀 Meme Bitcoin (MBTC)
+# 🚀 MemeBitcoin (MBTC)
 
-Meme Bitcoin (MBTC) is an upgradable ERC-20 token deployed on the **Binance Smart Chain (BSC) Mainnet**.
+MemeBitcoin (MBTC) is an upgradable ERC-20 token deployed on the **Binance Smart Chain (BSC) Mainnet**.
 It features a programmatic, halving-based release schedule enforced entirely by on-chain contract logic, inspired by Bitcoin’s monetary policy.
 
 ---
