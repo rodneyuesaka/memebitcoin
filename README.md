@@ -48,7 +48,7 @@ Source code for both the token proxy and its implementation is verified on BscSc
 
 ## Governance
 
-The token has a single privileged role, the **owner**. The owner is a Safe smart account. You can read it on BscScan under *Contract → Read as Proxy → `owner`*.
+The token has a single privileged role, the **owner**. The owner is a Safe smart account held by three signers with a threshold of two (see [Custody](#custody)). You can always read the current owner on BscScan under *Contract → Read as Proxy → `owner`*.
 
 The owner can do exactly two things:
 
@@ -56,6 +56,21 @@ The owner can do exactly two things:
 2. **Upgrade the implementation** through UUPS (`upgradeToAndCall`).
 
 The owner cannot mint, burn, pause transfers, or move tokens held by others. There is no mint function after deployment.
+
+---
+
+## Custody
+
+Two Safe smart accounts hold everything that matters. Each requires **2 of 3** signers, and the three signers are the same for both.
+
+| Safe | Address | Role |
+|:-----|:--------|:-----|
+| Owner Safe | [0x0Bc23BaB9B36c9fca36965205c51d2b32e901fF7](https://bscscan.com/address/0x0Bc23BaB9B36c9fca36965205c51d2b32e901fF7) | Owner of the token contract: changes the release destination, performs UUPS upgrades. Holds no MBTC. |
+| Vault Safe | [0x549ea29B1c0334f1fE1f492Ac4C5F345B7F61A27](https://bscscan.com/address/0x549ea29B1c0334f1fE1f492Ac4C5F345B7F61A27) | Current `distributionContract`: receives every 10-minute release and holds released supply pending distribution. |
+
+Both are SafeL2 1.4.1 accounts with **no modules and no transaction guards**, so nothing can move funds outside the 2-of-3 signature path. Their balances and every transaction they make are public on BscScan, and the owner and destination are readable from the token contract at any time.
+
+Before 2026-09-19 the release destination was the Claim contract. Its balance was moved to the Vault Safe and the contract was retired.
 
 ---
 
