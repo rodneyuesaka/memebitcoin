@@ -15,12 +15,12 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
  * [!] This contract sends released tokens to a distribution/claim contract.
  */
 contract MbtcBscTokenUpgradable is
-    Initializable,
-    ERC20Upgradeable,
-    OwnableUpgradeable,
-    ReentrancyGuardUpgradeable,
-    AccessControlUpgradeable,
-    UUPSUpgradeable
+Initializable,
+ERC20Upgradeable,
+OwnableUpgradeable,
+ReentrancyGuardUpgradeable,
+AccessControlUpgradeable,
+UUPSUpgradeable
 {
 
     // --- Constants ---
